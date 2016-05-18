@@ -3,6 +3,8 @@ from time import ctime
 import time
 import threading
 import sys
+import ctypes
+FOREGROUND_DARKYELLOW = 0x06 # dark yellow.
 
 HOST = 'localhost'
 PORT = 9999
@@ -12,6 +14,7 @@ usrdic=[]
 offlinemsg = {}
 socketary ={}
 filetmp = {}
+f = ''
 
 def initial():
 	global usrdic
@@ -48,6 +51,8 @@ def addfriend(msg, uname):
 		if friendtb[uname]== '':
 			friendtb[uname].append(msg[2])
 			msg = ' Add friend << ' + msg[2] + ' >>\n'
+			f.write(uname + ':' + msg)
+			f.flush()
 			socketary[uname].send(msg.encode())
 		else:
 			flagrep = 0
@@ -66,6 +71,8 @@ def addfriend(msg, uname):
 						flagexist = 1
 						friendtb[uname].append(msg[2])
 						msg = ' Add friend << ' + msg[2] + ' >>\n'
+						f.write(uname + ':' + msg)
+						f.flush()
 						socketary[uname].send(msg.encode())
 						break
 				
@@ -80,6 +87,8 @@ def delfriend(msg, uname):
 			flagrep = 1
 			friendtb[uname].remove(msg[2])
 			msg = ' Delete friend << ' + msg[2] + ' >> Done.\n'
+			f.write(uname + ':' + msg)
+			f.flush()
 			socketary[uname].send(msg.encode())
 			break
 	if flagrep == 0:
@@ -147,9 +156,22 @@ def managemsg(msg, uname):
 				offlinemsg[whoname].append(data)
 				socketary[uname].send('\b'.encode())
 
+				
+def managetalk(msg, uname):
+	tousr = msg[1]
+	while True:
+		data = socketary[uname].recv(1024).decode()
+		if data == 'quit':
+			socketary[uname].send(' '.encode())
+			break;
+		ttt = '\b\b From ' + uname + ' : ' + data
+		
+		socketary[tousr].send(ttt.encode())
 		
 def managesendfile(msg, uname):
 	
+	f.write(uname + ': sendfile ' + msg[2] + ' to ' + msg[1])
+	f.flush()
 	# certify usr exist
 	flagexist = 0
 
@@ -211,6 +233,8 @@ def chatthread(sock, uname):
 			continue
 		msg = data.split(' ')
 		if msg[0] == 'exit':
+			f.write('User << ' + uname + ' >> Logout.\n')
+			f.flush()
 			sys.stdout.write('\b User << ' + uname + ' >> Logout.\n')
 			socketary[uname].send('exit'.encode())
 			for d in usrdic:
@@ -222,6 +246,9 @@ def chatthread(sock, uname):
 		elif msg[0] == 'send':
 			managemsg(msg, uname)
 
+		elif msg[0] == 'talk':
+			managetalk(msg, uname)
+			
 		elif msg[0] == 'friend':
 			managefriend(msg, uname)
 
@@ -254,12 +281,17 @@ def certifyID(sock):
 			if d['line'] == 'online':
 				sock.send("Double Login!!".encode())
 				sock.close()
+				f.write('User << '+ usrname +' >> Double Login.\n>')
+				f.flush()
 				sys.stdout.write('\b User << '+ usrname +' >> Double Login.\n>')
 				
 			else:
 				sock.send("Welcome".encode())
 				d['line'] = 'online'
-
+				for d in usrdic:
+					if d['username'] != usrname and d['line'] == 'online':
+						sendmsg = usrname + ' online~\n'
+						socketary[d['username']].send(sendmsg.encode())
 				# add socket in ary
 				socketary[usrname] = sock
 				data = socketary[usrname].recv(1024).decode()
@@ -269,17 +301,23 @@ def certifyID(sock):
 				chat = threading.Thread(target = chatthread, args = (sock, usrname))
 				chat.start()
 				
+				f.write('User << '+ usrname +' >> Login Successful.\n>')
+				f.flush()
 				sys.stdout.write('\b User << '+ usrname +' >> Login Successful.\n>')
 				
 		# match usrname, password error
 		elif d['username'] == usrname and d['password'] != usrpwd:
 			flag = 1
 			sock.send(" Error Password!\n".encode())
+			f.write('User << '+ usrname +' >> Login Error Password.\n>')
+			f.flush()
 			sys.stdout.write('\b User << '+ usrname +' >> Login Error Password.\n>')
 			
 	# no any match
 	if flag == 0:
 		sock.send(" Error Login!\n".encode())
+		f.write('Login Error.\n>')
+		f.flush()
 		sys.stdout.write('\b  Login Error.\n>')
 
 
@@ -287,7 +325,7 @@ if __name__ == '__main__':
  	
 	# initialize usr lsit
 	initial()
-
+	f = open('server.log', 'w')
 	SerSock = socket(AF_INET, SOCK_STREAM)
 	SerSock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) # reuse tcp
 	SerSock.bind(ADDR)
