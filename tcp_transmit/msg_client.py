@@ -4,6 +4,7 @@ import threading
 import getpass
 import os
 import time
+import ctypes
 
 HOST = 'localhost'
 PORT = 9999
@@ -91,7 +92,7 @@ def recv(sock, name):
 					break  
 				f.write(dd)
 		else:
-			sys.stdout.write('\b ' + data + '\n> ')	
+			sys.stdout.write('\b \033[31;33m' + data + '\033[0m\n> ')	
 			
 		'''
 			if req == 'yes':
@@ -121,7 +122,7 @@ if __name__ == '__main__':
 		login = username + "/" + password
 		CliSock.send(login.encode())
 		data = CliSock.recv(1024).decode()
-		sys.stdout.write('\b  ' + data + ', ' + username + '\n> ')
+		sys.stdout.write('\b  \033[31;1m' + data + ', ' + username + '\033[0m\n> ')
 
 		if data == "Welcome":
 			CliSock.send("msg".encode())
